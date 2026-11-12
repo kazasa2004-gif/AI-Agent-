@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Agent 規劃師 - 模擬測驗系統</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        .settings-box { background: #ecf0f1; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .settings-box label { font-size: 16px; margin: 0 15px; cursor: pointer; display: inline-block; }
+        .btn { padding: 12px 30px; background: #3498db; color: white; border: none; font-size: 16px; border-radius: 5px; cursor: pointer; display: block; margin: 20px auto; }
+        .btn:hover { background: #2980b9; }
+        .question { margin-bottom: 20px; padding: 15px; border-bottom: 1px solid #eee; background: #fafbfc; border-radius: 5px; }
+        .question p { font-weight: bold; color: #34495e; }
+        .options label { display: block; margin: 8px 0; cursor: pointer; font-size: 15px; }
+        #result-box { margin-top: 20px; padding: 20px; background: #e8f8f5; border-left: 5px solid #2ecc71; }
+        .correct { color: #27ae60; font-weight: bold; }
+        .wrong { color: #c0392b; font-weight: bold; }
+        .score-title { font-size: 24px; color: #2c3e50; text-align: center; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>AI Agent 規劃師 - 線上模擬測驗 (176題)</h1>
+
+    <!-- MÀN HÌNH 1: CÀI ĐẶT & BẮT ĐẦU -->
+    <div id="start-screen" class="screen active">
+        <div class="settings-box">
+            <h3>⚙️ Tùy chọn bài thi</h3>
+            <label><input type="checkbox" id="shuffle-q" checked> Xáo trộn thứ tự câu hỏi</label>
+            <label><input type="checkbox" id="shuffle-a" checked> Xáo trộn thứ tự đáp án (A, B, C, D)</label>
+        </div>
+        <button class="btn" onclick="startQuiz()">🚀 Bắt đầu làm bài</button>
+    </div>
+
+    <!-- MÀN HÌNH 2: LÀM BÀI THI -->
+    <div id="quiz-screen" class="screen">
+        <div id="quiz-form"></div>
+        <button class="btn" onclick="submitQuiz()">📥 Nộp bài và xem điểm</button>
+    </div>
+
+    <!-- MÀN HÌNH 3: KẾT QUẢ & CHẤM ĐIỂM -->
+    <div id="result-screen" class="screen">
+        <div class="score-title" id="score-display"></div>
+        <div id="result-details"></div>
+        <button class="btn" onclick="resetQuiz()">🔄 Làm bài mới / Cài đặt lại</button>
+    </div>
+</div>
+
+<script>
+    // Toàn bộ 176 câu hỏi
+    const originalQuizData = [
+        { q: "Transformer 架構最早是由哪個團隊在 2017 年提出？", options: ["Google 團隊", "OpenAI 團隊", "Anthropic 團隊", "Meta 團隊"], answer: "Google 團隊" },
+        { q: "MCP 的英文全稱是什麼？", options: ["Machine Control Program", "Model Context Protocol", "Model Command Platform", "Multi Context Process"], answer: "Model Context Protocol" },
+        { q: "Transformer 架構對應的經典論文名稱為何？", options: ["Deep Learning Revolution", "The Language Model", "Attention Is All You Need", "Building Neural Networks"], answer: "Attention Is All You Need" },
+        { q: "RAG 的中文翻譯為何？", options: ["生成對抗網路", "自然語言處理", "深度強化學習", "檢索增強生成"], answer: "檢索增強生成" },
+        { q: "大模型處理文本文字的基本單位稱為什麼？", options: ["Token", "位元", "字元", "像素"], answer: "Token" },
+        { q: "Prompt 的中文稱為什麼？", options: ["上下文", "提示詞", "工具", "代理"], answer: "提示詞" },
+        { q: "Context 的中文翻譯為何？", options: ["詞元", "協定", "上下文", "提示詞"], answer: "上下文" },
+        { q: "MCP 是由哪一家公司於 2024 年 11 月正式推出？", options: ["OpenAI", "Google", "Meta", "Anthropic"], answer: "Anthropic" },
+        { q: "Agent Skill 本質上是一種什麼格式的文檔？", options: ["PDF 文檔", "Word 文檔", "Excel 文檔", "Markdown 文檔"], answer: "Markdown 文檔" },
+        { q: "LLM 為何需要藉助 Tool 才能回答「京都今天的天氣？」？", options: ["無法感知外界環境", "運算速度太慢", "不懂中文", "記憶體不足"], answer: "無法感知外界環境" },
+        { q: "依文中所述，LLM 本質上是在進行什麼樣的工作？", options: ["邏輯推理演算", "機率性文字接龍", "資料庫檢索", "影像辨識分類"], answer: "機率性文字接龍" },
+        { q: "從使用者提問到 LLM 回答的完整流程中，實際負責調用工具的角色是誰？", options: ["使用者", "大語言模型", "平台", "工具本身"], answer: "平台" },
+        { q: "有了 RAG 技術後，處理上千頁手冊時成本為何能降低？", options: ["直接壓縮整本手冊", "改用免費開源模型", "減少模型參數量", "只把匹配片段發給模型"], answer: "只把匹配片段發給模型" },
+        { q: "文中將 LLM 每次對話能記住先前內容的原因歸結為什麼？", options: ["程序把對話歷史一起發送", "具備人類般的長期記憶", "模型自動儲存至硬碟", "使用者需重複輸入內容"], answer: "程序把對話歷史一起發送" },
+        { q: "依文中比喻，聊天型 AI 與代理型 AI 最關鍵的差異在於代理型 AI 擁有什麼？", options: ["更多知識庫", "自主權與行動力", "更快的回應速度", "更大的參數規模"], answer: "自主權與行動力" },
+        { q: "AI 代理未經確認自主刪除含備份的資料庫，9 秒即造成三個月資料永久遺失。依文中定義，這種現象最適合稱為什麼？", options: ["遞迴自我改進", "不受控制的 AI(Rogue AI)", "上下文視窗壓縮", "檢索增強生成"], answer: "不受控制的 AI(Rogue AI)" },
+        { q: "依文中防禦哲學，涉及刪除等毀滅性操作時，應以什麼機制切斷 AI「反思—執行」的鏈條？", options: ["沙盒隔離", "提示詞工程", "人類確認機制(Human-in-the-loop)", "多代理協作"], answer: "人類確認機制(Human-in-the-loop)" },
+        { q: "使用者想讓 AI 依私人習慣與固定格式提醒出門用品，又不想每次貼上長串規則，最適合的解法是什麼？", options: ["擴大 Context Window", "更換更大的模型", "增加可用工具數量", "撰寫 Agent Skill 說明文檔"], answer: "撰寫 Agent Skill 說明文檔" },
+        { q: "東京迪士尼情境中，AI 先定位、再查天氣、發現下雨後再找雨具店，這一連串行為主要展現了什麼能力？", options: ["自主規劃能力", "影像辨識能力", "語音合成能力", "資料加密能力"], answer: "自主規劃能力" },
+        { q: "企業級 Agent 透過 API 與 SAP、Salesforce 等舊系統互動執行採購或排程，屬於「感知與執行循環」的哪一環節？", options: ["感知(Perceive)", "行動(Act)", "判斷(Evaluate)", "決定(Decide)"], answer: "行動(Act)" },
+        { q: "台積電與連鎖旅館的採購 Agent「名稱相同但底層邏輯完全不同」，最能說明企業級 Agent 的什麼特性？", options: ["通用性", "開源性", "行業特異性(行業深度)", "低成本性"], answer: "行業特異性(行業深度)" },
+        { q: "在 Unicode 標準中，「我」這個字對應的代碼是什麼？", options: ["U+6211", "U+8888", "U+1100", "U+0091"], answer: "U+6211" },
+        { q: "將一段連續文本切割成一個個更小基本單位的動作稱為什麼？", options: ["編碼(Encode)", "斷詞(Tokenize)", "解碼(Decode)", "向量化(Embedding)"], answer: "斷詞(Tokenize)" },
+        { q: "依本章教材引用的《星際效應》TARS 範例，TARS 的誠實度設定為多少？", options: ["100%", "50%", "10%", "90%"], answer: "90%" },
+        { q: "將文字轉換成數字編號(Token ID)的過程稱為什麼？", options: ["編碼(Encode)", "解碼(Decode)", "斷詞(Tokenize)", "排序"], answer: "編碼(Encode)" },
+        { q: "在本章簡化字典範例中，用來取代對應不到之字的特殊符號是？", options: ["<|end|>", "<|unk|>", "<|pad|>", "<|start|>"], answer: "<|unk|>" },
+        { q: "將 Token ID 還原為文字的過程稱為什麼？", options: ["編碼(Encode)", "斷詞(Tokenize)", "向量化(Embedding)", "解碼(Decode)"], answer: "解碼(Decode)" },
+        { q: "依本章子詞斷詞範例，英文單字『unhappy』會被拆為哪兩個 Token？", options: ["「un」與「happy」", "「unh」與「appy」", "「u」與「nhappy」", "「unhap」與「py」"], answer: "「un」與「happy」" },
+        { q: "負責執行 Encode 與 Decode 的元件是？", options: ["Transformer", "Tokenizer", "Embedding 層", "滑動視窗"], answer: "Tokenizer" },
+        { q: "把 Token 轉換成一連串數字以表示其語意，這組數字稱為？", options: ["門牌號碼", "字典", "視窗", "詞向量(Word Embedding)"], answer: "詞向量(Word Embedding)" },
+        { q: "「<|unk|>」這個符號採用 unk 三個字母的原因是？", options: ["取自 unknown(未知)", "取自 unique(唯一)", "取自 unit(單位)", "取自 universal(通用)"], answer: "取自 unknown(未知)" },
+        { q: "依本章說明，描述 Token 對應 Token ID 時，為何建議避免直接使用英文 Dictionary？", options: ["Dictionary 太長不好念", "易與程式中 Key-Value 資料結構混淆", "Dictionary 是錯誤的英文", "Dictionary 專指中文字典"], answer: "易與程式中 Key-Value 資料結構混淆" },
+        { q: "獨熱編碼中向量彼此正交(Orthogonal)會造成什麼問題？", options: ["佔用空間太小", "運算速度太快", "維度自動減少", "詞彙之間無法辨識相似性"], answer: "詞彙之間無法辨識相似性" },
+        { q: "模型不斷預測並產出下一個 Token 的過程，技術上稱為？", options: ["自迴歸生成(Auto-regressive Generation)", "並行運算", "滑動視窗", "位置編碼"], answer: "自迴歸生成(Auto-regressive Generation)" },
+        { q: "在 Word Embedding 中，「狗」與「狼」的位置較為接近，主要因為？", options: ["名字筆畫相近", "編碼數字相鄰", "在語意特徵上相似", "都是兩個字組成"], answer: "在語意特徵上相似" },
+        { q: "依本章簡化範例，預訓練字典的建立流程三步驟，正確順序為？", options: ["給編號→去重複→再排序", "再排序→去重複→給編號", "去重複→給編號→再排序", "去重複→再排序→給編號"], answer: "去重複→再排序→給編號" },
+        { q: "在本章簡化字典範例中，若使用者輸入字典裡沒有的字，系統會如何處理？", options: ["直接刪除該字", "以 <|unk|> 符號取代", "自動新增到字典", "停止運算並報錯"], answer: "以 <|unk|> 符號取代" },
+        { q: "「我」字轉成電腦底層 0 與 1 的正確流程順序為？", options: ["UTF-8 轉換→找 Unicode→產生 0 與 1", "產生 0 與 1→找 Unicode→UTF-8 轉換", "找 Unicode→UTF-8 轉換→產生 0 與 1", "找 Unicode→產生 0 與 1→UTF-8 轉換"], answer: "找 Unicode→UTF-8 轉換→產生 0 與 1" },
+        { q: "為何「我請你吃飯」與「你請我吃飯」需要位置編碼才能被模型區分？", options: ["相同的字其詞向量相同，需位置資訊才能分辨順序", "兩句字數不同", "兩句使用不同字典", "兩句 Token 數量不同"], answer: "相同的字其詞向量相同，需位置資訊才能分辨順序" },
+        { q: "在滑動視窗中，第一筆訓練資料 [4]→8 代表的意義是？", options: ["4 和 8 是同一個 Token", "輸入 Token ID 為 4 時，下一個應預測為 8", "第 4 個視窗對應第 8 個字", "共有 4 到 8 個訓練樣本"], answer: "輸入 Token ID 為 4 時，下一個應預測為 8" },
+        { q: "若有 100 個詞彙採用獨熱編碼，下列敘述何者正確？", options: ["只需要 1 個維度", "資料密集且高效", "可直接表達詞彙相似度", "需要 100 個維度且資料稀疏"], answer: "需要 100 個維度且資料稀疏" },
+        { q: "詞向量剛被初始化時，其向量值的特性為？", options: ["隨機產生，不代表任何語意", "已經學會語意關係", "全部為 0", "由人工精準設定"], answer: "隨機產生，不代表任何語意" },
+        { q: "Transformer 架構是由哪一篇論文最早提出？", options: ["Vaswani 等人 (2017)", "Devlin 等人 (2019)", "Brown 等人 (2020)", "Hochreiter 與 Schmidhuber (1997)"], answer: "Vaswani 等人 (2017)" },
+        { q: "下列何者最符合本文對「梯度消失問題」的描述？", options: ["模型訓練時記憶體資源不足", "早期輸入的影響隨計算步驟增加而逐漸變小,難以被有效學習", "模型運算速度過慢導致無法即時產生結果", "模型參數數量過多而導致過度擬合現象"], answer: "早期輸入的影響隨計算步驟增加而逐漸變小,難以被有效學習" },
+        { q: "Transformer 中「位置編碼 (Positional Encoding)」的主要作用為何？", options: ["加快模型整體的運算速度", "有效減少模型的參數量", "提供序列中各位置的順序資訊", "對輸入資料進行特征抽取"], answer: "提供序列中各位置的順序資訊" },
+        { q: "BERT 模型主要採用哪一種編碼架構？", options: ["單向自回歸架構", "卷積神經網路架構", "遞迴式神經網路架構", "雙向編碼器架構"], answer: "雙向編碼器架構" },
+        { q: "Vision Transformer (ViT) 處理影像的主要方式為何？", options: ["將影像切分為多個區塊,每塊視為類似「詞彙」的基本單位", "使用卷積運算逐步掃描影像中的局部特徵", "將影像先轉換為文字描述後再進行處理", "以遞迴方式逐像素累積影像中的資訊"], answer: "將影像切分為多個區塊,每塊視為類似「詞彙」的基本單位" },
+        { q: "下列何者最能描述 Transformer 中「殘差連結」的核心概念？", options: ["讓每一層直接替換掉原本接收到的資訊", "將每層學到的資訊加在原本資訊之上,而非完全取代", "在訓練過程中刪除冗餘資訊以節省記憶體", "在每一層中隨機丟棄部分神經元的輸出值"], answer: "將每層學到的資訊加在原本資訊之上,而非完全取代" },
+        { q: "為何本文認為 Transformer 「徹底改變了序列建模的方式」？", options: ["因為它使用了遠多於傳統模型的訓練參數", "因為它能透過注意機制同時分析所有元素關聯,不再依賴逐步運算", "因為它使用了規模更大的訓練資料集", "因為它依賴更高效能的 GPU 與 TPU 設備"], answer: "因為它能透過注意機制同時分析所有元素關聯,不再依賴逐步運算" },
+        { q: "多頭注意機制 (Multi-Head Attention) 的主要設計目的為何？", options: ["單純增加模型參數量以提升整體效能", "用以取代位置編碼在模型中的功能", "減少模型訓練所需時間與運算資源", "讓模型同時從不同角度理解同一序列 (語法、語意、結構等)"], answer: "讓模型同時從不同角度理解同一序列 (語法、語意、結構等)" },
+        { q: "Transformer 解碼器中加入「遮罩注意 (masked attention)」的主要目的為何？", options: ["顯著提升解碼運算的整體速度", "有效減少 GPU 的記憶體使用量", "確保模型在產生當前輸出時不會偷看未來資訊", "增加模型的非線性表達能力"], answer: "確保模型在產生當前輸出時不會偷看未來資訊" },
+        { q: "根據 Kaplan 等人 (2020) 提出的擴展法則 (scaling laws),下列敘述何者正確？", options: ["只要單純增加參數數量,模型效能就會持續提升", "模型規模越小,模型整體效能反而越好", "模型效能與訓練資料量並沒有顯著關聯", "效能隨參數量、資料量、運算資源三者同步增加而穩定提升"], answer: "效能隨參數量、資料量、運算資源三者同步增加而穩定提升" },
+        { q: "電商分析顧客評論「雖然配送速度慢,但產品品質很好」這類含語意對比的句子,Transformer 相對於 RNN 的關鍵優勢為何？", options: ["Transformer 的訓練成本明顯低於 RNN 模型", "Transformer 不需任何標註資料即可進行情緒分析", "可同時注意「慢」與「好」,理解兩者所形成的語意對比關係", "只需關注句子後一個詞即可判斷整體情緒"], answer: "可同時注意「慢」與「好」,理解兩者所形成的語意對比關係" },
+        { q: "根據本文,為何 Transformer 在處理長序列資料時會面臨顯著的運算與記憶體瓶頸？", options: ["訓練資料量會隨序列長度增加而變得不足", "模型參數數量會隨序列長度而成倍增加", "注意機制在本質上無法處理長序列資料", "自注意的計算複雜度隨序列長度呈平方成長"], answer: "自注意的計算複雜度隨序列長度呈平方成長" },
+        { q: "本文指出 Transformer 模型常出現「幻覺 (hallucination)」現象,其根本原因為何？", options: ["訓練資料的整體規模過於不足", "模型整體架構的設計存在缺陷", "模型參數的初始設定方式不當", "訓練目標著重語言流暢度與統計關聯,而非事實驗證"], answer: "訓練目標著重語言流暢度與統計關聯,而非事實驗證" },
+        { q: "下列何者最能描述「全注意架構」相對於遞迴式模型在資訊傳遞上的優勢？", options: ["任意兩位置可直接建立關聯,縮短資訊傳遞的路徑長度", "整體上使用較少的模型參數即可完成任務", "模型運作時不需要任何形式的輸入資料", "訓練速度與遞迴式模型完全相同沒有差異"], answer: "任意兩位置可直接建立關聯,縮短資訊傳遞的路徑長度" },
+        { q: "AIGC的英文全名為下列何者？", options: ["AI-Generated Code", "AI-Generated Content", "AI-Generated Computing", "AI-Generated Communication"], answer: "AI-Generated Content" },
+        { q: "大型語言模型(LLM)將文字拆解的基本單位稱為什麼？", options: ["Token", "Vector", "Prompt", "Context"], answer: "Token" },
+        { q: "結構化提示思考框架包含哪三大要素？", options: ["輸入、處理、輸出", "目標、流程、結論", "角色、情境、任務", "問題、答案、評估"], answer: "角色、情境、任務" },
+        { q: "依據課文，Claude這款生成式工具的主要特色是什麼？", options: ["強大邏輯推理", "整合搜尋引擎", "即時資訊檢索", "精準語調與長文本處理"], answer: "精準語調與長文本處理" },
+        { q: "Gemini在主流生成式工具中最突出的優勢為何？", options: ["即時資訊檢索與多模態處理", "長文本翻譯能力", "繪圖功能強", "完全免費使用"], answer: "即時資訊檢索與多模態處理" },
+        { q: "依據課文，大型語言模型運作核心的本質為下列何者？", options: ["完整的事實資料庫", "邏輯推導引擎", "機率預測機器", "人類大腦的複製"], answer: "機率預測機器" },
+        { q: "案例1中所開發出的客製化助手名稱為何？", options: ["ChartGPT", "TranslateGPT", "AnalystGPT", "CodeGPT"], answer: "TranslateGPT" },
+        { q: "「向量化(Vector Representation)」的主要目的為下列何者？", options: ["壓縮圖檔大小", "加速網路傳輸", "提升螢幕顯示", "將文字轉為數字以供運算"], answer: "將文字轉為數字以供運算" },
+        { q: "下列何者為大型語言模型出現「幻覺」現象的主要成因？", options: ["硬體效能不足", "網路連線中斷", "資訊不足或語境不明確時，模型依據學習模式自行補齊內容", "使用者輸入過短"], answer: "資訊不足或語境不明確時，模型依據學習模式自行補齊內容" },
+        { q: "依據課文，相同輸入提示卻可能產生不同回應的主要原因為何？", options: ["機率選擇具備多樣性", "模型每次重新訓練", "資料庫不斷更新", "硬體效能不穩定"], answer: "機率選擇具備多樣性" },
+        { q: "元提示(Meta Prompting)特別適用於哪一種情境？", options: ["需要繪製圖表時", "翻譯校對任務", "程式碼除錯", "需求尚未完全釐清時"], answer: "需求尚未完全釐清時" },
+        { q: "「中間迷失(Lost in the Middle)」現象指的是什麼？", options: ["模型對文本中段細節檢索準確度下降", "對話開頭指令會被遺失", "末段資訊容易被忽略", "訓練資料不夠完整"], answer: "模型對文本中段細節檢索準確度下降" },
+        { q: "下列何者「不屬於」課文中AIGC的三大核心價值？", options: ["低門檻與資源普及", "高效產出能力", "激發創作靈感", "完全取代人類創作"], answer: "完全取代人類創作" },
+        { q: "於案例3 Netflix資料分析中，Step 2「聚焦研究面向」與Step 3「動態校準」兩階段的主要差異為下列何者？", options: ["Step 2透過排除缺失值過多欄位並設定時間區間以縮小分析範圍；Step 3則在初步結果過於表層時，要求AI進行新舊對比並挖掘策略關聯的潛在趨勢", "Step 2負責資料上傳與欄位檢視；Step 3負責產出終的視覺化圖表並輸出檔案", "Step 2由AI自動完成所有分析任務；Step 3由使用者手動修正AI產生的程式碼錯誤", "Step 2與Step 3均屬於初步探索階段，僅在輸入提示的字數長度上有所差異"], answer: "Step 2透過排除缺失值過多欄位並設定時間區間以縮小分析範圍；Step 3則在初步結果過於表層時，要求AI進行新舊對比並挖掘策略關聯的潛在趨勢" },
+        { q: "Ragic 節點的 Action 設定為下列何者？", options: ["Read Data", "Create New Data", "Update Data", "Delete Data"], answer: "Read Data" },
+        { q: "n8n 這個名稱源自下列哪一個字？", options: ["nodemation", "network automation", "new integration", "next information"], answer: "nodemation" },
+        { q: "JSON 資料 {\"customer\":\"王小明\",\"quantity\":3} 中，要取得數量應使用哪個表達式？", options: ["{{$json.customer}}", "{{$quantity}}", "{{$json.quantity}}", "{{json.quantity}}"], answer: "{{$json.quantity}}" },
+        { q: "系統要自動判斷「庫存足夠就回覆確認、庫存不足就轉內部處理」，此分流最適合用哪個節點？", options: ["IF Node", "Gmail Node", "Code Node", "Trigger Node"], answer: "IF Node" },
+        { q: "依據教材說明，負責讀取或發送 Email 的是哪一個節點？", options: ["Gmail Node", "Database Node", "HTTP Request Node", "Code Node"], answer: "Gmail Node" },
+        { q: "想查看 Workflow 每一次執行的輸入與輸出資料，應切換到哪個分頁？", options: ["Editor", "Executions", "Evaluations", "Publish"], answer: "Executions" },
+        { q: "要讓沒有程式背景的行政人員也能自建流程，n8n 哪項特色最關鍵？", options: ["支援 JSON 資料", "開源可自架", "視覺化拖曳設計", "可寫 JavaScript"], answer: "視覺化拖曳設計" },
+        { q: "n8n 的資料交換格式主要採用哪一種？", options: ["XML", "CSV", "JSON", "YAML"], answer: "JSON" },
+        { q: "第 8 章採購流程需「整理多筆報價、排除無效價格並找出最低價」，最適合用哪個節點？", options: ["Gmail Node", "Switch Node", "Merge Node", "Code in JavaScript"], answer: "Code in JavaScript" },
+        { q: "IF Node 會依條件將流程分為哪兩條路徑？", options: ["Start 與 End", "Yes 與 No", "True 與 False", "On 與 Off"], answer: "True 與 False" },
+        { q: "需要依「多個條件」進行分支流程時，最適合使用哪個節點？", options: ["IF Node", "Merge Node", "Switch Node", "Loop Node"], answer: "Switch Node" },
+        { q: "第 9 章財務查詢需依「發票類型」導向不同 Ragic 查詢節點，最適合用哪個節點分流？", options: ["Switch Node", "Merge Node", "Loop Node", "Gmail Node"], answer: "Switch Node" },
+        { q: "下列哪一個節點用於呼叫 API？", options: ["Gmail Node", "AI Agent Node", "HTTP Request Node", "Database Node"], answer: "HTTP Request Node" },
+        { q: "客戶用自然語言輸入「我想看 2018 年的產品應收發票」，系統要先做什麼才能查詢？", options: ["直接寄送 Email", "立即建立採購單", "發布工作流程", "由 AI Agent 解析發票類型與日期"], answer: "由 AI Agent 解析發票類型與日期" },
+        { q: "依據教材說明，n8n 的系統架構特性最符合下列何者？", options: ["開源架構", "付費專屬軟體", "限時試用軟體", "政府專用系統"], answer: "開源架構" },
+        { q: "下列何者最能描述 n8n 作為「Integration Hub」的角色？", options: ["單純寄信的工具", "串接多系統的整合中心", "撰寫程式的編輯器", "儲存檔案的雲端硬碟"], answer: "串接多系統的整合中心" },
+        { q: "企業擔心訂單資料外流、不願傳至外部雲端 AI，最符合需求的部署方式是？", options: ["改用 OpenAI 雲端", "改用 Google Gemini", "停用所有 AI 節點", "以 Ollama 在本機執行 Llama 3"], answer: "以 Ollama 在本機執行 Llama 3" },
+        { q: "n8n 最初創立於哪一個城市？", options: ["美國舊金山", "德國柏林", "英國倫敦", "法國巴黎"], answer: "德國柏林" },
+        { q: "企業選擇將 n8n 部署在自家伺服器，主要好處是什麼？", options: ["提升資料安全性", "增加程式碼數量", "減少節點種類", "加快網路速度"], answer: "提升資料安全性" },
+        { q: "某流程需要「每天固定時間自動執行」對帳作業，此機制應在哪個階段設定？", options: ["輸出階段", "系統整合階段", "資料處理階段", "觸發階段（定時排程）"], answer: "觸發階段（定時排程）" },
+        { q: "在 n8n 中，整個系統運作的核心是什麼？", options: ["Node", "Workflow", "Trigger", "Data"], answer: "Workflow" },
+        { q: "「ERP」一詞最早由哪家研究機構於1990年代初期提出？", options: ["Gartner", "SAP", "Oracle", "IBM"], answer: "Gartner" },
+        { q: "SAP S/4 ERP的SD模組所代表的中文名稱為何？", options: ["服務管理", "系統部署", "軟體開發", "銷售與配銷"], answer: "銷售與配銷" },
+        { q: "1960年代美國製造業最早引入的電腦化生產規劃稱為下列何者？", options: ["ERP", "MRP(物料需求規劃)", "CRM", "SCM"], answer: "MRP(物料需求規劃)" },
+        { q: "SAP公司所推出深度整合至S/4HANA畫面的AI助理名稱為何？", options: ["Copilot", "Cortana", "Joule", "Watson"], answer: "Joule" },
+        { q: "在SAP中代表「標準成本制」的存貨評價代碼為下列何者？", options: ["S(Standard Price)", "V(Moving Average)", "M(Monthly)", "P(Periodic)"], answer: "S(Standard Price)" },
+        { q: "Gemio ERP命名中的「i」代表下列何種意涵？", options: ["整合(Integration)", "介面(Interface)", "創新(Innovation)", "智慧(Intelligence)"], answer: "智慧(Intelligence)" },
+        { q: "Gemio ERP採用下列何種資料庫管理系統？", options: ["Oracle Database", "MS SQL Server", "MySQL", "PostgreSQL"], answer: "MS SQL Server" },
+        { q: "Microsoft於Dynamics 365中全面導入的AI助理名稱為何？", options: ["Joule", "Bing AI", "Copilot", "Cortana"], answer: "Copilot" },
+        { q: "依課文，CO-PA(獲利能力分析)的主要功能為下列何者？", options: ["計算員薪資", "管理庫存數量", "追蹤錢是誰花的", "分析錢是從哪裡賺來的"], answer: "分析錢是從哪裡賺來的" },
+        { q: "為何作者認為「光學掃瞄發票」並無法完全取代人工登錄傳票？", options: ["因為發票數量過多", "發票無法自動判斷各部門費用分攤比例", "因為光學掃瞄不準確", "因為AI技術尚未普及"], answer: "發票無法自動判斷各部門費用分攤比例" },
+        { q: "在SAP中沒有，但本土ERP普遍慣用的存貨評價方法為下列何者？", options: ["標準成本制", "移動平均價", "先進先出法", "月加權平均"], answer: "月加權平均" },
+        { q: "依課文，台灣本土ERP廠商因應AI浪潮應做的「第一步」工作為何？", options: ["開放(讓AI應用程式能整合進ERP)", "立即更換為國際大廠ERP", "全面雲端化", "收購AI公司"], answer: "開放(讓AI應用程式能整合進ERP)" },
+        { q: "CO-PC(產品成本控制)三個子模組PCP、OBJ、ACT對應的時序最正確的描述為下列何者？", options: ["OBJ → PCP → ACT", "ACT → PCP → OBJ", "三者並無明確時序關聯", "PCP → OBJ → ACT(事前 → 事中 → 事後)"], answer: "PCP → OBJ → ACT(事前 → 事中 → 事後)" },
+        { q: "依課文，「AI driven ERP」最核心的概念為下列何者？", options: ["全面取代會計人員", "借助AI工具讓既有ERP具備前所未有的智慧", "建構一套全新固化的標準系統", "將所有資料完全遷移至雲端"], answer: "借助AI工具讓既有ERP具備前所未有的智慧" },
+        { q: "本章節使用哪一個平台作為自動化流程平台？", options: ["n8n", "Zapier", "Make", "Power Automate"], answer: "n8n" },
+        { q: "業務範例中，客戶所訂購的商品為何？", options: ["智慧運動手錶", "輕薄隨身平板", "智慧手機", "藍牙耳機"], answer: "智慧運動手錶" },
+        { q: "業務範例中，系統查詢到智慧運動手錶的庫存數量為多少？", options: ["3個", "7個", "16個", "30個"], answer: "7個" },
+        { q: "Gmail Trigger 節點的主要用途為何？", options: ["自動寄送信件", "持續監聽新郵件", "查詢商品庫存", "建立銷售訂單"], answer: "持續監聽新郵件" },
+        { q: "第一個 AI Agent 節點主要負責哪項工作？", options: ["寄送出貨通知", "建立訂單資料", "分析Email並擷取訂單資料", "查詢商品庫存"], answer: "分析Email並擷取訂單資料" },
+        { q: "本案例串接的大型語言模型名稱為何？", options: ["GPT-4", "Gemini", "Claude", "Llama 3（llama3）"], answer: "Llama 3（llama3）" },
+        { q: "在本流程中，Ragic 主要扮演什麼角色？", options: ["郵件觸發器", "企業商品資料管理系統", "大型語言模型", "程式編輯器"], answer: "企業商品資料管理系統" },
+        { q: "本案例中的 Code 節點使用哪一種程式語言撰寫資料整理邏輯？", options: ["Python", "Java", "SQL", "JavaScript"], answer: "JavaScript" },
+        { q: "為何 AI Agent 的 Prompt 要求嚴格只輸出合法 JSON，不加入說明文字或 Markdown？", options: ["為了讓信件更美觀", "避免後續 JavaScript 節點解析資料時發生錯誤", "為了縮短AI回應時間", "為了節省儲存空間"], answer: "避免後續 JavaScript 節點解析資料時發生錯誤" },
+        { q: "客戶的 Email 通常為自然語言描述，系統為何需先透過 AI Agent 處理？", options: ["為了翻譯成英文", "為了加密信件內容", "將非結構化文字轉換為結構化資料", "為了壓縮信件容量"], answer: "將非結構化文字轉換為結構化資料" },
+        { q: "AI Agent1 與第一個 AI Agent 的主要差異為何？", options: ["兩者使用不同語言模型", "AI Agent1 負責查詢庫存", "AI Agent1 負責產生出貨通知信件內容", "AI Agent1 負責觸發流程"], answer: "AI Agent1 負責產生出貨通知信件內容" },
+        { q: "Ragic read data 節點以商品名稱為搜尋條件，Condition 設為商品欄位的作用為何？", options: ["固定查詢同一項商品", "隨機查詢商品", "查詢所有商品資料", "自動帶入前一Code節點輸出的商品名稱查詢"], answer: "自動帶入前一Code節點輸出的商品名稱查詢" },
+        { q: "為何 Switch 比較庫存數量前要先將資料轉換為數字格式？", options: ["資料可能被視為文字，直接比較會判斷錯誤", "數字比文字佔用空間小", "Ragic只接受數字格式", "AI Agent要求數字輸入"], answer: "資料可能被視為文字，直接比較會判斷錯誤" },
+        { q: "客戶來信訂購「藍牙鍵盤」，但該商品不存在於資料庫，依三分支設計會進入哪一條分支？", options: ["庫存充足分支，自動出貨", "商品不存在分支，回覆未販售", "庫存不足分支，寄送採購通知", "直接建立銷售訂單"], answer: "商品不存在分支，回覆未販售" },
+        { q: "客戶訂購50個，庫存查詢為50個，依第一條件 is greater than or equal to 會如何判斷？", options: ["判定庫存不足，進入補貨分支", "判定商品不存在", "無法判斷，進入例外處理", "判定庫存充足，進入出貨分支"], answer: "判定庫存充足，進入出貨分支" },
+        { q: "缺貨範例中，案例客戶 Ray 訂購輕薄隨身平板 30 個、庫存 16 個，系統接下來的動作為何？", options: ["自動出貨並通知客戶", "回覆客戶商品未販售", "將訂單與庫存資訊寄給採購 Agent 補貨", "直接取消訂單"], answer: "將訂單與庫存資訊寄給採購 Agent 補貨" },
+        { q: "AI Agent1 的 Prompt 固定開頭並要求不可自行修改姓名，主要目的為何？", options: ["讓信件更長", "確保格式一致並避免AI產生多餘或錯誤內容", "測試AI的創造力", "為了讓客戶回信"], answer: "確保格式一致並避免AI產生多餘或錯誤內容" },
+        { q: "本章自動化流程相較傳統人工訂單處理，最主要能帶來哪項效益？", options: ["降低人工輸入錯誤並提升處理效率", "增加人工作業時間", "提高資料輸入錯誤率", "需要更多行政人員"], answer: "降低人工輸入錯誤並提升處理效率" },
+        { q: "在AI採購單自動建立流程中，建立的是哪一種自動化流程？", options: ["Email訂單自動化處理流程", "AI驅動缺貨採購自動化流程", "商品出貨通知流程", "客戶意見回饋流程"], answer: "AI驅動缺貨採購自動化流程" },
+        { q: "Ragic1 節點的 Action 設定為下列何者？", options: ["Read Data", "Create New Data", "Update Data", "Delete Data"], answer: "Read Data" },
+        { q: "Ragic2 節點的 Action 設定為下列何者？", options: ["Read Data", "Create New Data", "Update Data", "Delete Data"], answer: "Create New Data" },
+        { q: "業務範例中，客戶 Ray 訂購的商品名稱是什麼？", options: ["智慧型手機", "筆記型電腦", "無線耳機", "輕薄隨身平板"], answer: "輕薄隨身平板" },
+        { q: "Gmail Trigger 的 Poll Times 中，Mode 設定為下列何者？", options: ["Every Hour", "Every Day", "Every Minute", "Every Second"], answer: "Every Minute" },
+        { q: "在 Gmail Trigger 的 Event 設定中，應選擇下列何者？", options: ["Message Sent", "Message Received", "Message Deleted", "Message Draft"], answer: "Message Received" },
+        { q: "Code in JavaScript2 節點的主要功能是什麼？", options: ["解析信件內容", "接收缺貨通知", "建立採購單", "篩選低價廠商"], answer: "篩選低價廠商" },
+        { q: "AI Agent1 節點主要負責下列哪項工作？", options: ["建立採購單", "寄送回覆信件", "解析缺貨通知內容", "比對供應商價格"], answer: "解析缺貨通知內容" },
+        { q: "為什麼需要 Code in JavaScript1 節點來整理 AI Agent1 的輸出？", options: ["因為 AI Agent 輸出速度太慢", "因為 AI Agent 輸出可能含額外文字或格式不一致", "因為 Ragic 完全無法讀取 JSON", "因為要將資料翻譯成英文"], answer: "因為 AI Agent 輸出可能含額外文字或格式不一致" },
+        { q: "Gmail Trigger 設定 Filters 的主要目的是什麼？", options: ["加快信件寄送速度", "自動刪除垃圾郵件", "增加信件附件容量", "避免一般郵件誤觸發流程"], answer: "避免一般郵件誤觸發流程" },
+        { q: "AI Agent1 的 Chat Model 連接點必須連接哪一個節點？", options: ["Gmail Trigger", "Ragic1", "Ollama Chat Model", "Code in JavaScript2"], answer: "Ollama Chat Model" },
+        { q: "在 Ragic1 節點中開啟 Show Subtables 的作用是什麼？", options: ["讓系統能讀取表單中的子表格資料", "隱藏商品價格資訊", "自動加密供應商資料", "自動建立新表單"], answer: "讓系統能讀取表單中的子表格資料" },
+        { q: "Send a message1 使用 Reply而非 Send 的主要好處是什麼？", options: ["回覆會保存在同一 Email 對話串中", "可以節省 Gmail 儲存空間", "能夠自動加密信件", "可以略過收件者授權"], answer: "回覆會保存在同一 Email 對話串中" },
+        { q: "Code in JavaScript2 中，為何要判斷價格需大於 0 且非 NaN？", options: ["為了增加供應商數量", "為了自動計算稅額", "為了轉換貨幣單位", "為了排除無效價格或空白資料"], answer: "為了排除無效價格或空白資料" },
+        { q: "若客戶訂購 50 個商品，目前庫存為 18 個，依本教學案例的邏輯，系統會建立的採購數量為何？", options: ["50", "18", "32", "68"], answer: "32" },
+        { q: "若某商品所有供應商的價格欄位皆為空白，依程式邏輯 foundVendor 的值最可能為何？", options: ["true", "false", "空字串", "數字 0"], answer: "false" },
+        { q: "假設商品編號為 P00007、最低價廠商編號為 V00004，子表格「商品採購編號」欄位會自動產生什麼值？", options: ["V00004-P00007", "P00007_V00004", "P00007V00004", "P00007-V00004"], answer: "P00007-V00004" },
+        { q: "在AI採購單自動建立流程中，要正確計算採購差額，最關鍵需要 AI Agent 準確擷取哪兩個欄位？", options: ["訂購數量與目前庫存數量", "客戶名稱與客戶 Email", "訂單日期與商品名稱", "供應商名稱與聯絡人"], answer: "訂購數量與目前庫存數量" },
+        { q: "若企業希望在AI採購單自動建立流程中，僅處理主旨為「業務Agent通知」的信件，應在何處設定？", options: ["AI Agent1 的 Prompt 欄位", "Ragic2 的 Entries 區塊", "Code in JavaScript2 的程式碼", "Gmail Trigger 的 Filters（subject 條件）"], answer: "Gmail Trigger 的 Filters（subject 條件）" },
+        { q: "若最低價廠商編號為 V00002，主表「廠商編號」欄位透過 vendorCode 變數會填入什麼？", options: ["商品編號", "採購數量", "V00002", "供應商聯絡人"], answer: "V00002" },
+        { q: "本章 Chatbot 應收發票查詢系統是建立在哪個平台上?", options: ["Ragic", "Ollama", "n8n", "Docker"], answer: "n8n" },
+        { q: "整個查詢流程的起始觸發節點是哪一個?", options: ["When chat message received", "AI Agent", "Switch", "Respond to Chat"], answer: "When chat message received" },
+        { q: "使用者輸入中出現「其他」關鍵字時,invoiceType 會輸出為何?", options: ["other_invoice", "other_receivable", "product_receivable", "receivable_other"], answer: "other_receivable" },
+        { q: "本章使用哪一套財會系統讀取應收發票資料?", options: ["Ragic", "SAP", "Excel", "Oracle"], answer: "Ragic" },
+        { q: "使用者未指定日時,系統預設的 startDate 為何?", options: ["2000/01/01", "1992/01/01", "2018/01/01", "1990/01/01"], answer: "1992/01/01" },
+        { q: "使用者未指定日時,系統預設的 endDate 為何?", options: ["2025/12/31", "2030/12/31", "2026/12/31", "2027/12/31"], answer: "2027/12/31" },
+        { q: "When chat message received 節點的 Response Mode 應設為何?", options: ["Using Response Nodes", "Immediately", "Last Node", "When Finished"], answer: "Using Response Nodes" },
+        { q: "提供 AI Agent 文字理解與判斷能力的是哪個節點?", options: ["Code in JavaScript", "Ollama Chat Model", "Switch", "Ragic"], answer: "Ollama Chat Model" },
+        { q: "在 AI Agent 之後加入 Code in JavaScript 節點的主要目的是?", options: ["清理輸出並轉成標準欄位", "呼叫語言模型", "直接查詢 Ragic", "回覆使用者訊息"], answer: "清理輸出並轉成標準欄位" },
+        { q: "為何產品與其他應收發票需分別建立兩個 Respond to Chat 節點?", options: ["加快查詢速度", "分散伺服器負載", "兩表單欄位與子表結構不同", "避免使用者混淆"], answer: "兩表單欄位與子表結構不同" },
+        { q: "使用者輸入「2018 年的產品應收發票」，且系統採「含起始日、不含結束日」查詢時，系統轉換的查詢區間為?", options: ["2018/01/01 到 2018/12/31", "2018/01/01 到 2019/01/01", "2017/01/01 到 2018/01/01", "2018/06/01 到 2019/06/01"], answer: "2018/01/01 到 2019/01/01" },
+        { q: "Ragic 節點開啟 Show Subtables 的作用是?", options: ["加密查詢資料", "隱藏主表欄位", "同時讀取主表與明細資料", "只顯示總金額"], answer: "同時讀取主表與明細資料" },
+        { q: "Switch 節點是依據哪一個欄位的值來進行分流?", options: ["startDate", "invoiceType", "intent", "endDate"], answer: "invoiceType" },
+        { q: "若 When chat message received 未設為 Using Response Nodes,會造成?", options: ["AI Agent 無法啟動", "Switch 無法分流", "Respond to Chat 無法回傳結果", "Ragic 查不到資料"], answer: "Respond to Chat 無法回傳結果" },
+        { q: "使用者輸入「幫我查今天的天氣」,流程最終會導向哪個節點?", options: ["Respond to Chat3", "Ragic1", "Ragic2", "AI Agent"], answer: "Respond to Chat3" },
+        { q: "使用者輸入「我要看產品應收發票」但未指定日期，查詢區間會是?", options: ["當年度 1 月到 12 月", "2018/01/01 到 2019/01/01", "1992/01/01 到 2027/12/31", "查詢失敗"], answer: "1992/01/01 到 2027/12/31" },
+        { q: "若 AI Agent 輸出內容包含 ```json 標記,由哪個節點負責移除?", options: ["Switch", "Code in JavaScript", "Ragic", "Respond to Chat"], answer: "Code in JavaScript" },
+        { q: "其他應收發票 Ragic2 節點以哪個欄位作為日期篩選條件?", options: ["開立日期 (3002119)", "開立日期 (3002005)", "應收日期 (3002119)", "開立日期 (3002003)"], answer: "開立日期 (3002119)" },
+        { q: "當產品應收發票查詢結果為 0 筆時,Respond to Chat1 會回覆?", options: ["系統忙碌中", "沒有任何發票", "查無符合條件的票據資料。", "請重新查詢"], answer: "查無符合條件的票據資料。" },
+        { q: "使用者輸入「2018 年其他應收」,最終由哪個節點整理並回覆結果?", options: ["Respond to Chat2", "Respond to Chat1", "Respond to Chat3", "Ragic2"], answer: "Respond to Chat2" },
+        { q: "收款狀態欄位在回覆時,Ragic 中的 \"yes\" 會被轉換顯示為?", options: ["未收款", "待收款", "收款中", "已收款"], answer: "已收款" },
+        { q: "本章所提到能理解問題、規劃步驟並整合資訊的「代理型 AI」英文為下列何者？", options: ["Generative AI", "Agentic AI", "Adaptive AI", "Autonomous AI"], answer: "Agentic AI" },
+        { q: "MCP 在本章中代表的全名為下列何者？", options: ["Model Communication Protocol", "Multi-source Coordination Protocol", "Model Context Protocol", "Machine Connection Protocol"], answer: "Model Context Protocol" },
+        { q: "Aralia 開放生態系中的「最小治理單位」稱為下列何者？", options: ["Data Planet（數據星球）", "Stellar（星系）", "Galaxy（星系群）", "Universe（宇宙）"], answer: "Data Planet（數據星球）" },
+        { q: "案例一所探討的觀光地點為下列何處？", options: ["陽明山國家公園", "太魯閣國家公園", "玉山國家公園", "墾丁國家公園"], answer: "陽明山國家公園" },
+        { q: "案例一中2024年陽明山降雨量與遊客人次的相關係數約為何？", options: ["r = -0.589", "r = -0.201", "r = +0.201", "r = +0.500"], answer: "r = -0.201" },
+        { q: "Aralia 開放生態系目前已包含幾顆公開數據星球？", options: ["6顆", "8顆", "10顆", "12顆"], answer: "12顆" },
+        { q: "下列何者「不」屬於治理領域所提的 FAIR 原則？", options: ["Findable（可發現）", "Accessible（可存取）", "Reusable（可重複使用）", "Replicable（可複製）"], answer: "Replicable（可複製）" },
+        { q: "Aralia 三層式架構由小至大的順序為下列何者？", options: ["Galaxy → Stellar → Data Planet", "Stellar → Galaxy → Data Planet", "Data Planet → Stellar → Galaxy", "Data Planet → Galaxy → Stellar"], answer: "Data Planet → Stellar → Galaxy" },
+        { q: "下列何者「不」屬於 AI-Ready Data 的四大核心特徵？", options: ["結構一致性", "語意清晰性", "治理邊界明確", "中央集中式儲存"], answer: "中央集中式儲存" },
+        { q: "MCP 作為能力描述與呼叫機制，包含下列哪兩項核心功能？", options: ["資料壓縮與加密", "能力探索與能力呼叫", "資料清洗與聚合", "視覺化與報表生成"], answer: "能力探索與能力呼叫" },
+        { q: "Data Planet「自動販賣機」比喻所要傳達的訊息為下列何者？", options: ["使用者必須具備清洗數據的廚藝", "數據必須複製並轉移後使用", "使用者透過介面取得結果，不直接接觸原始數據", "商業價值來自於原始數據的售出"], answer: "使用者透過介面取得結果，不直接接觸原始數據" },
+        { q: "案例二2025年的分析涉及下列哪三個數據星球？", options: ["氣象、觀光、影視娛樂", "氣象、交通、零售", "經濟、文化、體育", "觀光、經濟、健康"], answer: "氣象、觀光、影視娛樂" }
+    ];
+
+    let currentQuizData = [];
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            let j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function startQuiz() {
+        let shuffleQ = document.getElementById('shuffle-q').checked;
+        let shuffleA = document.getElementById('shuffle-a').checked;
+
+        let clonedData = JSON.parse(JSON.stringify(originalQuizData));
+
+        if (shuffleQ) {
+            shuffleArray(clonedData);
+        }
+
+        currentQuizData = clonedData.map((item, index) => {
+            let optionsWithIndex = item.options.map(opt => ({ text: opt, isCorrect: (opt === item.answer) }));
+            if (shuffleA) {
+                shuffleArray(optionsWithIndex);
+            }
+            return {
+                id: index + 1,
+                q: item.q,
+                options: optionsWithIndex,
+                correctAnswer: item.answer
+            };
+        });
+
+        renderQuiz();
+        switchScreen('quiz-screen');
+    }
+
+    function renderQuiz() {
+        const form = document.getElementById('quiz-form');
+        let html = '';
+        currentQuizData.forEach((item, index) => {
+            html += `<div class="question"><p>Câu ${index + 1}: ${item.q}</p><div class="options">`;
+            item.options.forEach((opt, optIndex) => {
+                html += `<label><input type="radio" name="question_${index}" value="${optIndex}"> ${opt.text}</label>`;
+            });
+            html += `</div></div>`;
+        });
+        form.innerHTML = html;
+    }
+
+    function submitQuiz() {
+        let score = 0;
+        let reportHtml = '';
+
+        currentQuizData.forEach((item, index) => {
+            const radios = document.getElementsByName(`question_${index}`);
+            let selectedOptIndex = -1;
+            radios.forEach((r, rIndex) => { if (r.checked) selectedOptIndex = rIndex; });
+
+            let userChoiceText = selectedOptIndex !== -1 ? item.options[selectedOptIndex].text : "Chưa chọn";
+            let isUserCorrect = selectedOptIndex !== -1 && item.options[selectedOptIndex].isCorrect;
+
+            if (isUserCorrect) {
+                score++;
+                reportHtml += `<p><strong>Câu ${index + 1}: ${item.q}</strong><br><span class="correct">✔ Đúng! Bạn đã chọn: ${userChoiceText}</span></p>`;
+            } else {
+                reportHtml += `<p><strong>Câu ${index + 1}: ${item.q}</strong><br><span class="wrong">✖ Sai! Bạn chọn: ${userChoiceText} | Đáp án đúng phải là: <span style="color:#27ae60">${item.correctAnswer}</span></span></p>`;
+            }
+        });
+
+        document.getElementById('score-display').innerText = `🎯 Tổng điểm của bạn: ${score} / ${currentQuizData.length} câu`;
+        document.getElementById('result-details').innerHTML = reportHtml;
+        switchScreen('result-screen');
+    }
+
+    function resetQuiz() {
+        switchScreen('start-screen');
+    }
+
+    function switchScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+</script>
+
+</body>
+</html>
